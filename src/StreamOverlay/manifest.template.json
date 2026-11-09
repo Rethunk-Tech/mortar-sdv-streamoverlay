@@ -1,0 +1,10 @@
+{
+  "Name": "Mortar Stream Overlay",
+  "Author": "Rethunk.Tech",
+  "Version": "@VERSION@",
+  "Description": "Serves the game state Mortar's stream overlay page reads. Installed by Mortar while its stream overlay setting is on.",
+  "UniqueID": "tech.rethunk.mortar.StreamOverlay",
+  "EntryDll": "StreamOverlay.dll",
+  "MinimumApiVersion": "4.5.2",
+  "MinimumGameVersion": "1.6.14"
+}

@@ -39,6 +39,9 @@ public class OverlayTests
 
         string headers = string.Join("\r\n", Enumerable.Range(0, 100).Select(i => $"X-Filler-{i}: x"));
         Assert.Contains(" 431 ", await Request(port, "/state", headers + "\r\nAuthorization: Bearer overlay-token"));
+        Assert.Contains(" 200 ", await RawHeaderCount(port, 32, "Authorization: Bearer overlay-token"));
+        Assert.Contains(" 401 ", await RawHeaderCount(port, 32, "X-No-Token: x"));
+        Assert.Contains(" 431 ", await RawHeaderCount(port, 33, "Authorization: Bearer overlay-token"));
     }
 
     [Fact]
@@ -238,6 +241,34 @@ public class OverlayTests
         server.Dispose();
     }
 
+    [Fact]
+    public async Task HandleAfterDisposeDoesNotFaultTheTask()
+    {
+        Exception? unobserved = null;
+        EventHandler<UnobservedTaskExceptionEventArgs> onUnobserved = (_, e) =>
+        {
+            unobserved = e.Exception;
+            e.SetObserved();
+        };
+        TaskScheduler.UnobservedTaskException += onUnobserved;
+        try
+        {
+            var server = new OverlayServer(GetFreePort(), "overlay-token");
+            server.Dispose();
+            using var client = new TcpClient();
+            await server.Handle(client);
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            Assert.Null(unobserved);
+        }
+        finally
+        {
+            TaskScheduler.UnobservedTaskException -= onUnobserved;
+        }
+    }
+
     private sealed class HeldClients(List<TcpClient> clients) : IDisposable
     {
         public void Dispose()
@@ -284,6 +315,17 @@ public class OverlayTests
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         return ((IPEndPoint)listener.LocalEndpoint).Port;
+    }
+
+    private static async Task<string> RawHeaderCount(int port, int n, string first)
+    {
+        string rest = n == 1 ? first : first + "\r\n" + string.Join("\r\n", Enumerable.Range(1, n - 1).Select(i => $"X-Filler-{i}: x"));
+        using var client = new TcpClient();
+        await client.ConnectAsync(IPAddress.Loopback, port);
+        await using NetworkStream stream = client.GetStream();
+        await stream.WriteAsync(Encoding.ASCII.GetBytes($"GET /state HTTP/1.1\r\n{rest}\r\n\r\n"));
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        return await reader.ReadToEndAsync();
     }
 
     private static async Task<string> Request(int port, string target, string? header = null, string method = "GET")

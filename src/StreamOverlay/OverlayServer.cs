@@ -101,17 +101,16 @@ internal sealed class OverlayServer : IDisposable
         }
     }
 
-    private async Task Handle(TcpClient client)
+    internal async Task Handle(TcpClient client)
     {
         try
         {
             using (client)
             {
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(this.Cts.Token);
-                timeout.CancelAfter(ClientTimeout);
-
                 try
                 {
+                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(this.Cts.Token);
+                    timeout.CancelAfter(ClientTimeout);
                     NetworkStream stream = client.GetStream();
                     string response = await this.Process(stream, timeout.Token);
                     await stream.WriteAsync(Encoding.UTF8.GetBytes(response), timeout.Token);

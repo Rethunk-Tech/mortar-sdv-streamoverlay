@@ -136,14 +136,13 @@ internal sealed class OverlayServer : IDisposable
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         for (int count = 0; ; count++)
         {
-            if (count > MaxHeaderLines)
-                return Response(431, "{\"error\":\"too many headers\"}");
-
             string? line = await Protocol.ReadLine(stream, MaxHeaderLineBytes, cancel);
             if (line == null)
                 return Response(400, "{\"error\":\"bad request\"}");
             if (line.Length == 0)
                 break;
+            if (count >= MaxHeaderLines)
+                return Response(431, "{\"error\":\"too many headers\"}");
 
             int separator = line.IndexOf(':');
             if (separator <= 0)
